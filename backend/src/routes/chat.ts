@@ -21,26 +21,40 @@ router.post("/query", requireAuth, async (req, res) => {
   const { question } = parsed.data;
 
   try {
-    const searchResult = await tavilyClient.search(question, {
-      searchDepth: "advanced",
-      maxResults: 5,
-    });
+    let searchResult;
+    try {
+      searchResult = await tavilyClient.search(question, {
+        searchDepth: "basic",
+        maxResults: 4,
+      });
+    } catch (searchErr: any) {
+      console.error("Tavily search failed:", searchErr.message);
+      searchResult = { results: [], query: question, responseTime: 0, images: [], requestId: "" };
+    }
 
     const context = searchResult.results
-      .map((r) => `[${r.title}](${r.url}): ${r.content}`)
+      .map((r: any) => `[${r.title}](${r.url}): ${r.content}`)
       .join("\n\n");
 
+    const systemPrompt = searchResult.results.length > 0
+      ? `You are a helpful research assistant. Answer the user's question based on the provided search results. Cite sources where applicable.`
+      : `You are a helpful AI assistant. Answer the user's question to the best of your ability.`;
+
+    const prompt = searchResult.results.length > 0
+      ? `Search results:\n${context}\n\nQuestion: ${question}`
+      : `Question: ${question}`;
+
     const { text } = await generateText({
-      model: getModel("gpt-4o"),
-      system: `You are a helpful research assistant. Answer the user's question based on the provided search results. Cite sources where applicable.`,
-      prompt: `Search results:\n${context}\n\nQuestion: ${question}`,
+      model: getModel("gemini-2.0-flash"),
+      system: systemPrompt,
+      prompt,
     });
 
     const { error: dbError } = await supabase.from("queries").insert({
       user_id: req.userId,
       question,
       answer: text,
-      sources: searchResult.results.map((r) => ({
+      sources: searchResult.results.map((r: any) => ({
         title: r.title,
         url: r.url,
         content: r.content,
@@ -55,9 +69,9 @@ router.post("/query", requireAuth, async (req, res) => {
       answer: text,
       sources: searchResult.results,
     });
-  } catch (err) {
-    console.error("Query error:", err);
-    res.status(500).json({ error: "Failed to process query" });
+  } catch (err: any) {
+    console.error("Query error:", err.message, err.stack);
+    res.status(500).json({ error: `Failed to process query: ${err.message}` });
   }
 });
 
@@ -74,7 +88,7 @@ router.get("/history", requireAuth, async (req, res) => {
     return;
   }
 
-  res.json({ queries: data });
+  res.json({ queries: data || [] });
 });
 
 export default router;
