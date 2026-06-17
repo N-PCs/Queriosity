@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import {
   Sparkles,
   ArrowRight,
@@ -7,11 +7,14 @@ import {
   Twitter,
   Linkedin,
   Instagram,
-  Menu,
   Search,
   Plus,
+  LogIn,
+  UserPlus,
+  LogOut,
 } from "lucide-react";
 import heroThumb from "@/assets/hero-thumb.jpg";
+import { useAuth } from "../lib/auth";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -34,6 +37,8 @@ export const Route = createFileRoute("/")({
 });
 
 function Index() {
+  const { user, logout } = useAuth();
+
   return (
     <div className="relative min-h-screen w-full bg-background">
       {/* Background video */}
@@ -64,10 +69,43 @@ function Index() {
                   queriosity
                 </span>
               </div>
-              <button className="liquid-glass flex items-center gap-2 rounded-full px-4 py-2 text-xs text-white/80 transition-transform hover:scale-105">
-                <Menu className="h-4 w-4" />
-                <span>Menu</span>
-              </button>
+              <div className="flex items-center gap-2">
+                {user ? (
+                  <>
+                    <Link
+                      to="/chat"
+                      className="liquid-glass flex items-center gap-2 rounded-full px-4 py-2 text-xs text-white/80 transition-transform hover:scale-105"
+                    >
+                      <Sparkles className="h-3.5 w-3.5" />
+                      <span>Chat</span>
+                    </Link>
+                    <button
+                      onClick={logout}
+                      className="liquid-glass flex items-center gap-2 rounded-full px-4 py-2 text-xs text-white/80 transition-transform hover:scale-105"
+                    >
+                      <LogOut className="h-3.5 w-3.5" />
+                      <span>Logout</span>
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <Link
+                      to="/login"
+                      className="liquid-glass flex items-center gap-2 rounded-full px-4 py-2 text-xs text-white/80 transition-transform hover:scale-105"
+                    >
+                      <LogIn className="h-3.5 w-3.5" />
+                      <span>Sign in</span>
+                    </Link>
+                    <Link
+                      to="/signup"
+                      className="liquid-glass-strong flex items-center gap-2 rounded-full px-4 py-2 text-xs text-white transition-transform hover:scale-105"
+                    >
+                      <UserPlus className="h-3.5 w-3.5" />
+                      <span>Get started</span>
+                    </Link>
+                  </>
+                )}
+              </div>
             </nav>
 
             {/* Hero center */}
@@ -86,12 +124,27 @@ function Index() {
               </p>
 
               {/* Search-style CTA */}
-              <button className="liquid-glass-strong mt-8 flex items-center gap-3 rounded-full px-3 py-3 pr-6 text-sm text-white transition-transform hover:scale-105 active:scale-95">
-                <span className="flex h-7 w-7 items-center justify-center rounded-full bg-white/15">
-                  <Search className="h-3.5 w-3.5 text-white" />
-                </span>
-                <span>Ask anything</span>
-              </button>
+              {user ? (
+                <Link
+                  to="/chat"
+                  className="liquid-glass-strong mt-8 flex items-center gap-3 rounded-full px-3 py-3 pr-6 text-sm text-white transition-transform hover:scale-105 active:scale-95"
+                >
+                  <span className="flex h-7 w-7 items-center justify-center rounded-full bg-white/15">
+                    <Search className="h-3.5 w-3.5 text-white" />
+                  </span>
+                  <span>Ask anything</span>
+                </Link>
+              ) : (
+                <Link
+                  to="/signup"
+                  className="liquid-glass-strong mt-8 flex items-center gap-3 rounded-full px-3 py-3 pr-6 text-sm text-white transition-transform hover:scale-105 active:scale-95"
+                >
+                  <span className="flex h-7 w-7 items-center justify-center rounded-full bg-white/15">
+                    <Sparkles className="h-3.5 w-3.5 text-white" />
+                  </span>
+                  <span>Start asking</span>
+                </Link>
+              )}
 
               {/* Pills */}
               <div className="mt-6 flex flex-wrap items-center justify-center gap-2">
@@ -142,10 +195,23 @@ function Index() {
                 <span className="mx-1 h-3 w-px bg-white/20" />
                 <ArrowRight className="h-3.5 w-3.5 text-white/70" />
               </div>
-              <button className="liquid-glass flex items-center gap-2 rounded-full px-3 py-2 text-xs text-white/80 transition-transform hover:scale-105">
-                <Sparkles className="h-3.5 w-3.5" />
-                <span>Account</span>
-              </button>
+              {user ? (
+                <Link
+                  to="/chat"
+                  className="liquid-glass flex items-center gap-2 rounded-full px-3 py-2 text-xs text-white/80 transition-transform hover:scale-105"
+                >
+                  <Sparkles className="h-3.5 w-3.5" />
+                  <span>Chat</span>
+                </Link>
+              ) : (
+                <Link
+                  to="/login"
+                  className="liquid-glass flex items-center gap-2 rounded-full px-3 py-2 text-xs text-white/80 transition-transform hover:scale-105"
+                >
+                  <Sparkles className="h-3.5 w-3.5" />
+                  <span>Account</span>
+                </Link>
+              )}
             </div>
 
             {/* Community card */}

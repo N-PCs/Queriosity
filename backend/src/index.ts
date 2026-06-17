@@ -17,6 +17,13 @@ app.get("/health", (_req, res) => {
 app.use("/auth", authRoutes);
 app.use("/chat", chatRoutes);
 
+app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+  console.error("Unhandled error:", err);
+  res.status(err.status || 500).json({
+    error: err.type === "entity.parse.failed" ? "Invalid JSON in request body" : err.message || "Internal server error",
+  });
+});
+
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
 });
