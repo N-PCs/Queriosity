@@ -9,7 +9,7 @@
     "supabase:migrate": "bun run src/db/migrate.ts"
   },
   "dependencies": {
-    "@ai-sdk/gateway": "^3.0.133",
+    "@ai-sdk/google": "^3.0.83",
     "@supabase/supabase-js": "^2.49.4",
     "@tavily/core": "^0.7.6",
     "ai": "^6.0.184",
