@@ -9,6 +9,7 @@ import {
 } from "@tanstack/react-router";
 import { useEffect, type ReactNode } from "react";
 import { AuthProvider } from "../lib/auth";
+import Dither from "../components/Dither";
 
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
@@ -128,7 +129,20 @@ function RootComponent() {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        <Outlet />
+        <Dither 
+          waveColor={[0.35, 0.35, 0.4]}
+          disableAnimation={false}
+          enableMouseInteraction
+          mouseRadius={0.3}
+          colorNum={4}
+          waveAmplitude={0.3}
+          waveFrequency={3}
+          waveSpeed={0.05}
+        />
+        <div className="fixed inset-0 z-[1] bg-black/30 pointer-events-none" />
+        <div className="relative z-10">
+          <Outlet />
+        </div>
       </AuthProvider>
     </QueryClientProvider>
   );

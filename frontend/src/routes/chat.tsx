@@ -6,15 +6,9 @@ import {
   Sparkles,
   Search,
   Send,
-  ArrowLeft,
-  Plus,
   ArrowRight,
   History,
   LogOut,
-  Menu,
-  Twitter,
-  Linkedin,
-  Instagram,
 } from "lucide-react";
 
 export const Route = createFileRoute("/chat")({
@@ -119,16 +113,7 @@ function ChatPage() {
   }
 
   return (
-    <div className="relative min-h-screen w-full bg-background">
-      <video
-        className="fixed inset-0 z-0 h-full w-full object-cover"
-        src="https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260315_073750_51473149-4350-4920-ae24-c8214286f323.mp4"
-        autoPlay
-        loop
-        muted
-        playsInline
-      />
-      <div className="fixed inset-0 z-0 bg-black/30" />
+    <div className="relative min-h-screen w-full">
 
       <div className="relative z-10 flex min-h-screen flex-col">
         {/* Nav */}
@@ -164,37 +149,44 @@ function ChatPage() {
         </nav>
 
         <div className="flex flex-1 gap-0 lg:gap-6 px-4 lg:px-10 pb-6">
-          {/* History sidebar */}
+          {/* History sidebar — overlay on mobile, inline on desktop */}
           {showHistory && (
-            <aside className="w-full lg:w-72 shrink-0">
-              <div className="liquid-glass-strong rounded-3xl p-4 max-h-[calc(100vh-10rem)] overflow-y-auto">
-                <h3 className="text-xs uppercase tracking-widest text-white/50 mb-3">
-                  Past queries
-                </h3>
-                {historyLoading ? (
-                  <div className="text-xs text-white/40">Loading...</div>
-                ) : history.length === 0 ? (
-                  <div className="text-xs text-white/40">No queries yet</div>
-                ) : (
-                  <div className="space-y-2">
-                    {history.map((msg) => (
-                      <button
-                        key={msg.id}
-                        onClick={() => loadFromHistory(msg)}
-                        className="liquid-glass w-full text-left rounded-2xl p-3 text-xs text-white/80 transition-transform hover:scale-[1.02]"
-                      >
-                        <div className="truncate">{msg.question}</div>
-                        <div className="mt-1 text-[10px] text-white/40">
-                          {msg.created_at
-                            ? new Date(msg.created_at).toLocaleDateString()
-                            : ""}
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </aside>
+            <>
+              {/* Backdrop (mobile only) */}
+              <div
+                className="fixed inset-0 z-20 bg-black/50 lg:hidden"
+                onClick={() => setShowHistory(false)}
+              />
+              <aside className="fixed inset-x-4 top-20 z-30 lg:static lg:inset-auto lg:z-auto lg:w-72 shrink-0">
+                <div className="liquid-glass-strong rounded-3xl p-4 max-h-[60vh] lg:max-h-[calc(100vh-10rem)] overflow-y-auto">
+                  <h3 className="text-xs uppercase tracking-widest text-white/50 mb-3">
+                    Past queries
+                  </h3>
+                  {historyLoading ? (
+                    <div className="text-xs text-white/40">Loading...</div>
+                  ) : history.length === 0 ? (
+                    <div className="text-xs text-white/40">No queries yet</div>
+                  ) : (
+                    <div className="space-y-2">
+                      {history.map((msg) => (
+                        <button
+                          key={msg.id}
+                          onClick={() => loadFromHistory(msg)}
+                          className="liquid-glass w-full text-left rounded-2xl p-3 text-xs text-white/80 transition-transform hover:scale-[1.02]"
+                        >
+                          <div className="truncate">{msg.question}</div>
+                          <div className="mt-1 text-[10px] text-white/40">
+                            {msg.created_at
+                              ? new Date(msg.created_at).toLocaleDateString()
+                              : ""}
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </aside>
+            </>
           )}
 
           {/* Main chat area */}

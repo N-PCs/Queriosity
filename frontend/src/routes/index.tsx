@@ -40,17 +40,7 @@ function Index() {
   const { user, logout } = useAuth();
 
   return (
-    <div className="relative min-h-screen w-full bg-background">
-      {/* Background video */}
-      <video
-        className="fixed inset-0 z-0 h-full w-full object-cover"
-        src="https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260315_073750_51473149-4350-4920-ae24-c8214286f323.mp4"
-        autoPlay
-        loop
-        muted
-        playsInline
-      />
-      <div className="fixed inset-0 z-0 bg-black/30" />
+    <div className="relative min-h-screen w-full">
 
       {/* Two-panel split */}
       <main className="relative z-10 flex min-h-screen w-full flex-col lg:flex-row">
@@ -114,7 +104,7 @@ function Index() {
                 <Sparkles className="h-9 w-9 text-white" />
               </div>
 
-              <h1 className="max-w-2xl text-6xl font-medium tracking-[-0.05em] text-white lg:text-7xl">
+              <h1 className="max-w-2xl text-4xl sm:text-5xl font-medium tracking-[-0.05em] text-white lg:text-7xl">
                 Curiosity, <em className="font-serif italic text-white/80">answered</em> instantly
               </h1>
 
@@ -192,8 +182,6 @@ function Index() {
                 <a href="#" className="text-white transition-colors hover:text-white/80">
                   <Instagram className="h-4 w-4" />
                 </a>
-                <span className="mx-1 h-3 w-px bg-white/20" />
-                <ArrowRight className="h-3.5 w-3.5 text-white/70" />
               </div>
               {user ? (
                 <Link
@@ -212,14 +200,6 @@ function Index() {
                   <span>Account</span>
                 </Link>
               )}
-            </div>
-
-            {/* Community card */}
-            <div className="liquid-glass mt-6 w-56 rounded-2xl p-4">
-              <h3 className="text-sm font-medium text-white">Join the curious</h3>
-              <p className="mt-1 text-xs text-white/60">
-                Share threads, save discoveries, and follow brilliant minds.
-              </p>
             </div>
 
             {/* Bottom feature section */}

@@ -27,8 +27,7 @@ function LoginPage() {
   };
 
   return (
-    <div className="relative min-h-screen w-full bg-background flex items-center justify-center p-4">
-      <div className="liquid-glass-strong absolute inset-4 rounded-3xl lg:inset-6" />
+    <div className="relative min-h-screen w-full flex items-center justify-center p-4">
 
       <div className="relative z-10 w-full max-w-sm">
         <Link
