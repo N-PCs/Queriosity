@@ -136,9 +136,7 @@ function ChatPage() {
         loadHistory();
       }
     } catch (err: any) {
-      const isLimitReached =
-        err.message?.includes("limit") ||
-        err.message?.includes("LIMIT_REACHED");
+      const isLimitReached = err.code === "LIMIT_REACHED" || err.status === 429;
 
       setMessages((prev) =>
         prev.map((m) =>

@@ -60,7 +60,10 @@ async function request<T>(
   }
 
   if (!res.ok) {
-    throw new Error(body.error || `Request failed (${res.status})`);
+    const error = new Error(body.error || `Request failed (${res.status})`) as any;
+    error.status = res.status;
+    error.code = body.code;
+    throw error;
   }
 
   return body;
