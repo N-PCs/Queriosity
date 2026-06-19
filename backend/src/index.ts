@@ -7,7 +7,12 @@ import chatRoutes from "./routes/chat";
 const app = express();
 const PORT = parseInt(process.env.PORT || "3001", 10);
 
-app.use(cors({ origin: process.env.CORS_ORIGIN || "*" }));
+app.use(
+  cors({
+    origin: process.env.CORS_ORIGIN || "*",
+    allowedHeaders: ["Content-Type", "Authorization", "x-gemini-key"],
+  })
+);
 app.use(express.json());
 
 app.get("/health", (_req, res) => {
