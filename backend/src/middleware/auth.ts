@@ -31,3 +31,24 @@ export async function requireAuth(
   req.userId = data.user.id;
   next();
 }
+
+export async function optionalAuth(
+  req: Request,
+  res: Response,
+  next: NextFunction
+) {
+  const authHeader = req.headers.authorization;
+  if (!authHeader?.startsWith("Bearer ")) {
+    return next();
+  }
+
+  const token = authHeader.slice(7);
+  try {
+    const { data, error } = await supabase.auth.getUser(token);
+    if (!error && data.user) {
+      req.userId = data.user.id;
+    }
+  } catch {}
+  next();
+}
+

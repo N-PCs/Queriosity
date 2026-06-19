@@ -12,6 +12,7 @@ import {
   LogIn,
   UserPlus,
   LogOut,
+  History,
 } from "lucide-react";
 import heroThumb from "@/assets/hero-thumb.jpg";
 import { useAuth } from "../lib/auth";
@@ -55,40 +56,48 @@ function Index() {
                 <div className="flex h-8 w-8 items-center justify-center rounded-full bg-white/10">
                   <Sparkles className="h-4 w-4 text-white" />
                 </div>
-                <span className="text-2xl font-semibold tracking-tighter text-white">
+                <span className="text-xl sm:text-2xl font-semibold tracking-tighter text-white">
                   queriosity
                 </span>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5 sm:gap-2">
                 {user ? (
                   <>
                     <Link
                       to="/chat"
-                      className="liquid-glass flex items-center gap-2 rounded-full px-4 py-2 text-xs text-white/80 transition-transform hover:scale-105"
+                      className="liquid-glass flex items-center gap-1.5 rounded-full px-3 py-2 text-xs text-white/80 transition-transform hover:scale-105"
                     >
                       <Sparkles className="h-3.5 w-3.5" />
                       <span>Chat</span>
                     </Link>
+                    <Link
+                      to="/chat"
+                      search={{ history: "true" }}
+                      className="liquid-glass flex items-center gap-1.5 rounded-full px-3 py-2 text-xs text-white/80 transition-transform hover:scale-105"
+                    >
+                      <History className="h-3.5 w-3.5" />
+                      <span className="hidden sm:inline">History</span>
+                    </Link>
                     <button
                       onClick={logout}
-                      className="liquid-glass flex items-center gap-2 rounded-full px-4 py-2 text-xs text-white/80 transition-transform hover:scale-105"
+                      className="liquid-glass flex items-center gap-1.5 rounded-full px-3 py-2 text-xs text-white/80 transition-transform hover:scale-105"
                     >
                       <LogOut className="h-3.5 w-3.5" />
-                      <span>Logout</span>
+                      <span className="hidden sm:inline">Logout</span>
                     </button>
                   </>
                 ) : (
                   <>
                     <Link
                       to="/login"
-                      className="liquid-glass flex items-center gap-2 rounded-full px-4 py-2 text-xs text-white/80 transition-transform hover:scale-105"
+                      className="liquid-glass flex items-center gap-1.5 rounded-full px-3 py-2 text-xs text-white/80 transition-transform hover:scale-105"
                     >
                       <LogIn className="h-3.5 w-3.5" />
                       <span>Sign in</span>
                     </Link>
                     <Link
                       to="/signup"
-                      className="liquid-glass-strong flex items-center gap-2 rounded-full px-4 py-2 text-xs text-white transition-transform hover:scale-105"
+                      className="liquid-glass-strong flex items-center gap-1.5 rounded-full px-3 py-2 text-xs text-white transition-transform hover:scale-105"
                     >
                       <UserPlus className="h-3.5 w-3.5" />
                       <span>Get started</span>
@@ -126,13 +135,13 @@ function Index() {
                 </Link>
               ) : (
                 <Link
-                  to="/signup"
+                  to="/chat"
                   className="liquid-glass-strong mt-8 flex items-center gap-3 rounded-full px-3 py-3 pr-6 text-sm text-white transition-transform hover:scale-105 active:scale-95"
                 >
                   <span className="flex h-7 w-7 items-center justify-center rounded-full bg-white/15">
                     <Sparkles className="h-3.5 w-3.5 text-white" />
                   </span>
-                  <span>Start asking</span>
+                  <span>Try for free</span>
                 </Link>
               )}
 

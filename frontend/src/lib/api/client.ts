@@ -29,6 +29,16 @@ async function request<T>(
   };
   if (token) headers.Authorization = `Bearer ${token}`;
 
+  try {
+    const customKey =
+      typeof window !== "undefined"
+        ? localStorage.getItem("queriosity_custom_gemini_key")
+        : null;
+    if (customKey) {
+      headers["x-gemini-key"] = customKey;
+    }
+  } catch {}
+
   const url = `${API_URL}${path}`;
 
   let res: Response;
