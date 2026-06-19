@@ -70,7 +70,7 @@ router.post("/query", optionalAuth, async (req, res) => {
       : `Question: ${question}`;
 
     const { text } = await generateText({
-      model: getModel("gemini-2.0-flash", customApiKey),
+      model: getModel("gemini-1.5-flash", customApiKey),
       system: systemPrompt,
       prompt,
     });
