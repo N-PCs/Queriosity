@@ -1,4 +1,4 @@
-# 🔍 Queriosity
+# Queriosity
 
 An elegant, real-time AI-powered search engine and research assistant. Queriosity leverages advanced Retrieval-Augmented Generation (RAG) to provide instant, cited answers to complex queries, complete with source lists, rich media, and smart follow-up suggestions.
 
@@ -17,19 +17,19 @@ An elegant, real-time AI-powered search engine and research assistant. Queriosit
 
 ---
 
-## ✨ Features
+## Features
 
-- **🌐 Real-Time Web Search**: Backed by Tavily Search API, fetching the latest articles, content, and high-quality images.
-- **🧠 Hybrid AI Generation & Fallbacks**: Integrated with **Google Gemini** (Gemini 2.5/2.0) and **Groq** (Llama 3.3/3) via Vercel AI SDK. If one provider encounters rate limits or errors, the system seamlessly falls back to the other.
-- **📝 Structured Answers with Citations**: Automatic source citation referencing using numbered bracket links (e.g., `[1]`, `[2]`), complete with an interactive bibliography and image carousel.
-- **🔑 Custom API Key Support**: Bypass public daily usage limits by configuring your own Google Gemini or Groq API keys directly in the settings.
-- **🔐 Secure User Accounts**: User signup, login, and token-based authentication handled via Supabase Auth.
-- **📜 Query History**: Logs previous research queries to Supabase DB, allowing users to revisit past chats.
-- **⚡ Server-Side Rendering (SSR)**: Powered by TanStack Start and Nitro for ultra-fast load times and optimized client/server communication.
+- **Real-Time Web Search**: Backed by Tavily Search API, fetching the latest articles, content, and high-quality images.
+- **Hybrid AI Generation & Fallbacks**: Integrated with **Google Gemini** (Gemini 2.5/2.0) and **Groq** (Llama 3.3/3) via Vercel AI SDK. If one provider encounters rate limits or errors, the system seamlessly falls back to the other.
+- **Structured Answers with Citations**: Automatic source citation referencing using numbered bracket links (e.g., `[1]`, `[2]`), complete with an interactive bibliography and image carousel.
+- **Custom API Key Support**: Bypass public daily usage limits by configuring your own Google Gemini or Groq API keys directly in the settings.
+- **Secure User Accounts**: User signup, login, and token-based authentication handled via Supabase Auth.
+- **Query History**: Logs previous research queries to Supabase DB, allowing users to revisit past chats.
+- **Server-Side Rendering (SSR)**: Powered by TanStack Start and Nitro for ultra-fast load times and optimized client/server communication.
 
 ---
 
-## 🏗️ Project Structure
+## Project Structure
 
 The project is structured as a monorepo consisting of a Hono-based Cloudflare Worker backend and a TanStack Start frontend:
 
@@ -67,7 +67,7 @@ Queriosity/
 
 ---
 
-## 🔄 Workflow Diagram
+## Workflow Diagram
 
 The diagram below details the data flow when a user submits a query:
 
@@ -105,7 +105,7 @@ sequenceDiagram
 
 ---
 
-## 🚀 How to Use
+## How to Use
 
 ### Prerequisites
 - Node.js or [Bun](https://bun.sh/) (Recommended)
@@ -181,12 +181,12 @@ bun run build
 
 ---
 
-## 👥 Contributors
+## Contributors
 
 - **Neel Pandey** - [@N-PCs](https://github.com/N-PCs)
 
 ---
 
-## 📄 License
+## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
