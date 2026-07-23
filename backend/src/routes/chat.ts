@@ -1,48 +1,60 @@
-import { Router } from "express";
+import { Hono } from "hono";
 import { requireAuth, optionalAuth } from "../middleware/auth";
-import { supabase } from "../supabase";
-import { tavilyClient, getModel } from "../ai";
+import { getSupabase } from "../supabase";
+import { getTavilyClient, getModel } from "../ai";
 import { generateText } from "ai";
 import { z } from "zod";
+import type { AppEnv } from "../types";
 
-const router = Router();
+const chat = new Hono<AppEnv>();
 
 const querySchema = z.object({
   question: z.string().min(1),
 });
 
-router.post("/query", optionalAuth, async (req, res) => {
-  const parsed = querySchema.safeParse(req.body);
+chat.post("/query", optionalAuth, async (c) => {
+  let body: any;
+  try {
+    body = await c.req.json();
+  } catch {
+    return c.json({ error: "Invalid JSON in request body" }, 400);
+  }
+
+  const parsed = querySchema.safeParse(body);
   if (!parsed.success) {
-    res.status(400).json({ error: parsed.error.flatten() });
-    return;
+    return c.json({ error: parsed.error.flatten() }, 400);
   }
 
   const { question } = parsed.data;
-  const customGeminiKey = req.headers["x-gemini-key"] as string | undefined;
-  const customGroqKey = req.headers["x-groq-key"] as string | undefined;
-  const requestedProvider = (req.headers["x-ai-provider"] as string | undefined) || "auto";
+  const customGeminiKey = c.req.header("x-gemini-key");
+  const customGroqKey = c.req.header("x-groq-key");
+  const requestedProvider = c.req.header("x-ai-provider") || "auto";
 
+  const userId = c.get("userId");
   const hasCustomKey = Boolean(customGeminiKey || customGroqKey);
 
+  const supabase = getSupabase(c.env);
+
   // Check daily limit for logged-in users using host key (no custom API key)
-  if (req.userId && !hasCustomKey) {
+  if (userId && !hasCustomKey) {
     try {
       const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
       const { count, error: countError } = await supabase
         .from("queries")
         .select("*", { count: "exact", head: true })
-        .eq("user_id", req.userId)
+        .eq("user_id", userId)
         .gte("created_at", twentyFourHoursAgo);
 
       if (countError) {
         console.error("Failed to check daily query limit:", countError);
       } else if (count !== null && count >= 10) {
-        res.status(429).json({
-          error: "Daily query limit reached (10 queries/day). Please set your own API key in settings to continue.",
-          code: "LIMIT_REACHED"
-        });
-        return;
+        return c.json(
+          {
+            error: "Daily query limit reached (10 queries/day). Please set your own API key in settings to continue.",
+            code: "LIMIT_REACHED",
+          },
+          429
+        );
       }
     } catch (limitErr: any) {
       console.error("Error while checking limit:", limitErr.message);
@@ -52,6 +64,7 @@ router.post("/query", optionalAuth, async (req, res) => {
   try {
     let searchResult;
     try {
+      const tavilyClient = getTavilyClient(c.env);
       searchResult = await tavilyClient.search(question, {
         searchDepth: "basic",
         maxResults: 4,
@@ -75,10 +88,11 @@ router.post("/query", optionalAuth, async (req, res) => {
 
     // Candidate model fallback lists
     const geminiModels = ["gemini-2.5-flash", "gemini-2.5-pro", "gemini-2.0-flash", "gemini-2.0-flash-lite"];
-
     const groqModels = ["llama-3.3-70b-versatile", "llama3-8b-8192"];
 
     const attempts: { provider: "groq" | "gemini"; modelName: string }[] = [];
+
+    const defaultGroqKey = c.env.GROQ_API_KEY || process.env.GROQ_API_KEY;
 
     if (requestedProvider === "groq") {
       groqModels.forEach((m) => attempts.push({ provider: "groq", modelName: m }));
@@ -87,7 +101,7 @@ router.post("/query", optionalAuth, async (req, res) => {
       geminiModels.forEach((m) => attempts.push({ provider: "gemini", modelName: m }));
       groqModels.forEach((m) => attempts.push({ provider: "groq", modelName: m }));
     } else {
-      if (customGroqKey || process.env.GROQ_API_KEY) {
+      if (customGroqKey || defaultGroqKey) {
         groqModels.forEach((m) => attempts.push({ provider: "groq", modelName: m }));
         geminiModels.forEach((m) => attempts.push({ provider: "gemini", modelName: m }));
       } else {
@@ -107,6 +121,7 @@ router.post("/query", optionalAuth, async (req, res) => {
           model: attempt.modelName,
           customGeminiKey,
           customGroqKey,
+          env: c.env,
         });
 
         const result = await generateText({
@@ -132,10 +147,9 @@ router.post("/query", optionalAuth, async (req, res) => {
       throw lastError;
     }
 
-
-    if (req.userId) {
+    if (userId) {
       const { error: dbError } = await supabase.from("queries").insert({
-        user_id: req.userId,
+        user_id: userId,
         question,
         answer: text,
         sources: searchResult.results.map((r: any) => ({
@@ -150,7 +164,7 @@ router.post("/query", optionalAuth, async (req, res) => {
       }
     }
 
-    res.json({
+    return c.json({
       answer: text,
       sources: searchResult.results,
       providerUsed,
@@ -164,32 +178,35 @@ router.post("/query", optionalAuth, async (req, res) => {
       err.message?.toLowerCase().includes("exhausted");
 
     if (isQuotaError && !hasCustomKey) {
-      res.status(429).json({
-        error: "Daily AI usage limit reached. Please set your own API key in settings to continue.",
-        code: "LIMIT_REACHED",
-      });
-      return;
+      return c.json(
+        {
+          error: "Daily AI usage limit reached. Please set your own API key in settings to continue.",
+          code: "LIMIT_REACHED",
+        },
+        429
+      );
     }
 
-    res.status(500).json({ error: `Failed to process query: ${err.message}` });
+    return c.json({ error: `Failed to process query: ${err.message}` }, 500);
   }
 });
 
+chat.get("/history", requireAuth, async (c) => {
+  const userId = c.get("userId");
+  const supabase = getSupabase(c.env);
 
-router.get("/history", requireAuth, async (req, res) => {
   const { data, error } = await supabase
     .from("queries")
     .select("*")
-    .eq("user_id", req.userId)
+    .eq("user_id", userId)
     .order("created_at", { ascending: false })
     .limit(50);
 
   if (error) {
-    res.status(500).json({ error: error.message });
-    return;
+    return c.json({ error: error.message }, 500);
   }
 
-  res.json({ queries: data || [] });
+  return c.json({ queries: data || [] });
 });
 
-export default router;
+export default chat;

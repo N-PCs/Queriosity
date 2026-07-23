@@ -1,54 +1,38 @@
-import type { Request, Response, NextFunction } from "express";
-import { supabase } from "../supabase";
+import type { MiddlewareHandler } from "hono";
+import { getSupabase } from "../supabase";
+import type { AppEnv } from "../types";
 
-declare global {
-  namespace Express {
-    interface Request {
-      userId?: string;
-    }
-  }
-}
-
-export async function requireAuth(
-  req: Request,
-  res: Response,
-  next: NextFunction
-) {
-  const authHeader = req.headers.authorization;
+export const requireAuth: MiddlewareHandler<AppEnv> = async (c, next) => {
+  const authHeader = c.req.header("authorization");
   if (!authHeader?.startsWith("Bearer ")) {
-    res.status(401).json({ error: "Missing or invalid authorization header" });
-    return;
+    return c.json({ error: "Missing or invalid authorization header" }, 401);
   }
 
   const token = authHeader.slice(7);
+  const supabase = getSupabase(c.env);
   const { data, error } = await supabase.auth.getUser(token);
 
   if (error || !data.user) {
-    res.status(401).json({ error: "Invalid or expired token" });
-    return;
+    return c.json({ error: "Invalid or expired token" }, 401);
   }
 
-  req.userId = data.user.id;
-  next();
-}
+  c.set("userId", data.user.id);
+  await next();
+};
 
-export async function optionalAuth(
-  req: Request,
-  res: Response,
-  next: NextFunction
-) {
-  const authHeader = req.headers.authorization;
+export const optionalAuth: MiddlewareHandler<AppEnv> = async (c, next) => {
+  const authHeader = c.req.header("authorization");
   if (!authHeader?.startsWith("Bearer ")) {
-    return next();
+    return await next();
   }
 
   const token = authHeader.slice(7);
   try {
+    const supabase = getSupabase(c.env);
     const { data, error } = await supabase.auth.getUser(token);
     if (!error && data.user) {
-      req.userId = data.user.id;
+      c.set("userId", data.user.id);
     }
   } catch {}
-  next();
-}
-
+  await next();
+};

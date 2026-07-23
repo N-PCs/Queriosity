@@ -1,0 +1,19 @@
+# Cloudflare Workers Local Development Environment Variables (.dev.vars)
+# Copy this file to .dev.vars for local testing with `npx wrangler dev`
+
+# Google Gemini API - get key at https://aistudio.google.com/apikey
+GOOGLE_GENERATIVE_AI_API_KEY=your-google-api-key
+
+# Groq API - get key at https://console.groq.com/keys
+GROQ_API_KEY=your-groq-api-key
+
+# Supabase - get from Project Settings > API
+SUPABASE_URL=https://your-project-id.supabase.co
+SUPABASE_ANON_KEY=your-anon-key
+SUPABASE_SERVICE_KEY=your-service-role-key
+
+# Tavily Search API - get at https://tavily.com
+TAVILY_API_KEY=tvly-dev-your-key
+
+# Optional
+CORS_ORIGIN=*

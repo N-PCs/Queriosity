@@ -1,8 +1,9 @@
-import { Router } from "express";
-import { supabase } from "../supabase";
+import { Hono } from "hono";
+import { getSupabase, getSupabaseAdmin } from "../supabase";
 import { z } from "zod";
+import type { AppEnv } from "../types";
 
-const router = Router();
+const auth = new Hono<AppEnv>();
 
 const signupSchema = z.object({
   email: z.string().email(),
@@ -14,61 +15,72 @@ const loginSchema = z.object({
   password: z.string(),
 });
 
-router.post("/signup", async (req, res) => {
-  const parsed = signupSchema.safeParse(req.body);
+auth.post("/signup", async (c) => {
+  let body: any;
+  try {
+    body = await c.req.json();
+  } catch {
+    return c.json({ error: "Invalid JSON in request body" }, 400);
+  }
+
+  const parsed = signupSchema.safeParse(body);
   if (!parsed.success) {
-    res.status(400).json({ error: parsed.error.flatten() });
-    return;
+    return c.json({ error: parsed.error.flatten() }, 400);
   }
 
   const { email, password } = parsed.data;
+  const supabase = getSupabase(c.env);
   const { data, error } = await supabase.auth.signUp({ email, password });
 
   if (error) {
-    res.status(400).json({ error: error.message });
-    return;
+    return c.json({ error: error.message }, 400);
   }
 
-  res.status(201).json({ user: data.user, session: data.session });
+  return c.json({ user: data.user, session: data.session }, 201);
 });
 
-router.post("/login", async (req, res) => {
-  const parsed = loginSchema.safeParse(req.body);
+auth.post("/login", async (c) => {
+  let body: any;
+  try {
+    body = await c.req.json();
+  } catch {
+    return c.json({ error: "Invalid JSON in request body" }, 400);
+  }
+
+  const parsed = loginSchema.safeParse(body);
   if (!parsed.success) {
-    res.status(400).json({ error: parsed.error.flatten() });
-    return;
+    return c.json({ error: parsed.error.flatten() }, 400);
   }
 
   const { email, password } = parsed.data;
+  const supabase = getSupabase(c.env);
   const { data, error } = await supabase.auth.signInWithPassword({
     email,
     password,
   });
 
   if (error) {
-    res.status(401).json({ error: error.message });
-    return;
+    return c.json({ error: error.message }, 401);
   }
 
-  res.json({ user: data.user, session: data.session });
+  return c.json({ user: data.user, session: data.session });
 });
 
-router.post("/logout", async (req, res) => {
-  const authHeader = req.headers.authorization;
+auth.post("/logout", async (c) => {
+  const authHeader = c.req.header("authorization");
   if (!authHeader?.startsWith("Bearer ")) {
-    res.status(401).json({ error: "Not authenticated" });
-    return;
+    return c.json({ error: "Not authenticated" }, 401);
   }
 
   const token = authHeader.slice(7);
-  const { error } = await supabase.auth.admin.signOut(token);
+  const supabaseAdmin = getSupabaseAdmin(c.env);
+  const { error } = await supabaseAdmin.auth.admin.signOut(token);
 
   if (error) {
-    res.status(500).json({ error: error.message });
-    return;
+    return c.json({ error: error.message }, 500);
   }
 
-  res.json({ message: "Logged out" });
+  return c.json({ message: "Logged out" });
 });
 
-export default router;
+export default auth;

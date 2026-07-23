@@ -1,46 +1,45 @@
-import "dotenv/config";
-import express from "express";
-import cors from "cors";
+import { Hono } from "hono";
+import { cors } from "hono/cors";
 import authRoutes from "./routes/auth";
 import chatRoutes from "./routes/chat";
+import type { AppEnv } from "./types";
 
-const app = express();
-const PORT = parseInt(process.env.PORT || "3001", 10);
+const app = new Hono<AppEnv>();
 
-app.use(
-  cors({
-    origin: process.env.CORS_ORIGIN || "*",
-    allowedHeaders: ["Content-Type", "Authorization", "x-gemini-key", "x-groq-key", "x-ai-provider"],
-  })
-);
-app.use(express.json());
+app.use("*", async (c, next) => {
+  const origin = c.env?.CORS_ORIGIN || process.env.CORS_ORIGIN || "*";
+  const corsMiddleware = cors({
+    origin,
+    allowHeaders: ["Content-Type", "Authorization", "x-gemini-key", "x-groq-key", "x-ai-provider"],
+    allowMethods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  });
+  return corsMiddleware(c, next);
+});
 
-app.get("/", (_req, res) => {
-  res.json({
-    name: "Queriosity API",
+app.get("/", (c) => {
+  return c.json({
+    name: "Queriosity API (Cloudflare Workers)",
     status: "online",
     health: "/health",
     timestamp: new Date().toISOString(),
   });
 });
 
-app.get("/health", (_req, res) => {
-  res.json({ status: "ok", timestamp: new Date().toISOString() });
+app.get("/health", (c) => {
+  return c.json({ status: "ok", timestamp: new Date().toISOString() });
 });
 
+app.route("/auth", authRoutes);
+app.route("/chat", chatRoutes);
 
-app.use("/auth", authRoutes);
-app.use("/chat", chatRoutes);
-
-app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+app.onError((err, c) => {
   console.error("Unhandled error:", err);
-  res.status(err.status || 500).json({
-    error: err.type === "entity.parse.failed" ? "Invalid JSON in request body" : err.message || "Internal server error",
-  });
-});
-
-app.listen(PORT, () => {
-  console.log(`Server running on http://localhost:${PORT}`);
+  return c.json(
+    {
+      error: err.message || "Internal server error",
+    },
+    500
+  );
 });
 
 export default app;

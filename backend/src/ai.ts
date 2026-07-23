@@ -1,8 +1,12 @@
 import { google, createGoogleGenerativeAI } from "@ai-sdk/google";
 import { groq, createGroq } from "@ai-sdk/groq";
 import { tavily } from "@tavily/core";
+import type { Bindings } from "./types";
 
-export const tavilyClient = tavily({ apiKey: process.env.TAVILY_API_KEY! });
+export function getTavilyClient(env?: Bindings) {
+  const apiKey = env?.TAVILY_API_KEY || process.env.TAVILY_API_KEY || "";
+  return tavily({ apiKey });
+}
 
 export type AIProvider = "gemini" | "groq";
 
@@ -11,28 +15,28 @@ export interface GetModelOptions {
   model?: string;
   customGeminiKey?: string;
   customGroqKey?: string;
+  env?: Bindings;
 }
 
 export function getModel(options: GetModelOptions = {}): any {
-  const { provider = "gemini", customGeminiKey, customGroqKey } = options;
+  const { provider = "gemini", customGeminiKey, customGroqKey, env } = options;
 
   if (provider === "groq") {
     const modelName = options.model || "llama-3.3-70b-versatile";
-    if (customGroqKey) {
-      const customGroq = createGroq({ apiKey: customGroqKey });
-      return customGroq(modelName);
+    const apiKey = customGroqKey || env?.GROQ_API_KEY || process.env.GROQ_API_KEY;
+    if (apiKey) {
+      const groqInstance = createGroq({ apiKey });
+      return groqInstance(modelName);
     }
     return groq(modelName);
   }
 
   // Default provider: gemini
   const modelName = options.model || "gemini-2.5-flash";
-  if (customGeminiKey) {
-    const customGoogle = createGoogleGenerativeAI({
-      apiKey: customGeminiKey,
-    });
-    return customGoogle(modelName);
+  const apiKey = customGeminiKey || env?.GOOGLE_GENERATIVE_AI_API_KEY || process.env.GOOGLE_GENERATIVE_AI_API_KEY;
+  if (apiKey) {
+    const googleInstance = createGoogleGenerativeAI({ apiKey });
+    return googleInstance(modelName);
   }
   return google(modelName);
 }
-

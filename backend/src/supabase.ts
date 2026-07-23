@@ -1,17 +1,26 @@
-import { createClient } from "@supabase/supabase-js";
+import { createClient, SupabaseClient } from "@supabase/supabase-js";
+import type { Bindings } from "./types";
 
-const supabaseUrl = process.env.SUPABASE_URL!;
-const supabaseAnonKey = process.env.SUPABASE_ANON_KEY!;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_KEY;
+export function getSupabase(env?: Bindings): SupabaseClient {
+  const supabaseUrl = env?.SUPABASE_URL || process.env.SUPABASE_URL;
+  const supabaseAnonKey = env?.SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY;
 
-if (!supabaseUrl || !supabaseAnonKey) {
-  throw new Error(
-    "SUPABASE_URL and SUPABASE_ANON_KEY must be set in environment"
-  );
+  if (!supabaseUrl || !supabaseAnonKey) {
+    throw new Error(
+      "SUPABASE_URL and SUPABASE_ANON_KEY must be set in environment bindings or secrets"
+    );
+  }
+
+  return createClient(supabaseUrl, supabaseAnonKey);
 }
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+export function getSupabaseAdmin(env?: Bindings): SupabaseClient {
+  const supabaseUrl = env?.SUPABASE_URL || process.env.SUPABASE_URL;
+  const supabaseServiceKey = env?.SUPABASE_SERVICE_KEY || process.env.SUPABASE_SERVICE_KEY;
 
-export const supabaseAdmin = supabaseServiceKey
-  ? createClient(supabaseUrl, supabaseServiceKey)
-  : supabase;
+  if (supabaseUrl && supabaseServiceKey) {
+    return createClient(supabaseUrl, supabaseServiceKey);
+  }
+
+  return getSupabase(env);
+}
