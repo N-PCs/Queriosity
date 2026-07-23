@@ -20,30 +20,37 @@ const loginSchema = z.object({
  * AuthError has non-enumerable properties, so JSON.stringify() returns "{}".
  */
 function extractErrorMessage(error: any): string {
+  if (!error) return "Unknown error";
+
+  // Check for retryable fetch errors (Supabase unreachable)
+  if (error.name === "AuthRetryableFetchError" || error.status === 530) {
+    return "Unable to connect to the authentication service. The database may be paused or unreachable. Please check your Supabase dashboard.";
+  }
+
   // Direct .message (works for normal Error subclasses)
-  if (error && typeof error.message === "string" && error.message.length > 0) {
+  if (typeof error.message === "string" && error.message.length > 0 && error.message !== "{}") {
     return error.message;
   }
+
   // Some Supabase errors use .msg
-  if (error && typeof error.msg === "string" && error.msg.length > 0) {
+  if (typeof error.msg === "string" && error.msg.length > 0) {
     return error.msg;
   }
+
   // Try reading all own properties (including non-enumerable)
-  if (error && typeof error === "object") {
-    try {
-      const props: Record<string, any> = {};
-      for (const key of Object.getOwnPropertyNames(error)) {
-        props[key] = error[key];
-      }
-      const serialized = JSON.stringify(props);
-      if (serialized && serialized !== "{}") return serialized;
-    } catch {}
-  }
+  try {
+    const props: Record<string, any> = {};
+    for (const key of Object.getOwnPropertyNames(error)) {
+      if (key !== "stack") props[key] = error[key];
+    }
+    const serialized = JSON.stringify(props);
+    if (serialized && serialized !== "{}") return serialized;
+  } catch {}
+
   // Try String coercion
-  if (error) {
-    const str = String(error);
-    if (str && str !== "[object Object]") return str;
-  }
+  const str = String(error);
+  if (str && str !== "[object Object]") return str;
+
   return "Unknown authentication error";
 }
 
@@ -82,35 +89,11 @@ auth.post("/signup", async (c) => {
     const { data, error } = await supabase.auth.signUp({ email, password });
 
     if (error) {
-      // Diagnostic: log every possible property
-      console.error("Signup error raw typeof:", typeof error);
-      console.error("Signup error constructor:", error?.constructor?.name);
-      console.error("Signup error .message:", error.message);
-      console.error("Signup error .name:", (error as any).name);
-      console.error("Signup error .status:", (error as any).status);
-      console.error("Signup error .code:", (error as any).code);
-      console.error("Signup error .cause:", (error as any).cause);
-      try {
-        console.error("Signup error own props:", Object.getOwnPropertyNames(error));
-        const allProps: Record<string, any> = {};
-        for (const key of Object.getOwnPropertyNames(error)) {
-          allProps[key] = (error as any)[key];
-        }
-        console.error("Signup error all own values:", JSON.stringify(allProps));
-      } catch (logErr) {
-        console.error("Could not log own props:", logErr);
-      }
-      try {
-        console.error("Signup error keys:", Object.keys(error as any));
-      } catch {}
-      console.error("Signup error String():", String(error));
-
       const msg = extractErrorMessage(error);
-      console.error("Signup extracted msg:", msg);
-      return c.json({ error: msg, _debug_type: error?.constructor?.name, _debug_status: (error as any).status }, 400);
+      console.error("Signup error:", error.name, "status:", (error as any).status, "msg:", msg);
+      return c.json({ error: msg }, 400);
     }
 
-    // Also handle the case where data.user is null (email already registered with autoconfirm off)
     if (!data.user) {
       return c.json({ error: "Signup failed - no user returned. The email may already be registered." }, 400);
     }
@@ -118,9 +101,8 @@ auth.post("/signup", async (c) => {
     return c.json({ user: data.user, session: data.session }, 201);
   } catch (err: any) {
     const msg = extractErrorMessage(err);
-    console.error("Signup catch error:", msg);
-    console.error("Signup catch raw:", err);
-    return c.json({ error: msg, _debug: String(err) }, 500);
+    console.error("Signup exception:", msg);
+    return c.json({ error: msg }, 500);
   }
 });
 
@@ -147,15 +129,15 @@ auth.post("/login", async (c) => {
 
     if (error) {
       const msg = extractErrorMessage(error);
-      console.error("Login Supabase error:", msg, "| status:", (error as any).status);
+      console.error("Login error:", error.name, "status:", (error as any).status, "msg:", msg);
       return c.json({ error: msg }, 401);
     }
 
     return c.json({ user: data.user, session: data.session });
   } catch (err: any) {
     const msg = extractErrorMessage(err);
-    console.error("Login catch error:", msg);
-    return c.json({ error: err.message || "Login failed" }, 500);
+    console.error("Login exception:", msg);
+    return c.json({ error: msg }, 500);
   }
 });
 
