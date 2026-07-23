@@ -27,6 +27,7 @@ interface Message {
   question: string;
   answer: string;
   sources: { title: string; url: string; content: string }[];
+  providerUsed?: "gemini" | "groq";
   created_at?: string;
 }
 
@@ -37,21 +38,27 @@ function ChatPage() {
   const [query, setQuery] = useState("");
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(false);
+  const [isWarmingUp, setIsWarmingUp] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [history, setHistory] = useState<Message[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Settings state for custom Gemini API key
+  // Settings state for custom Gemini & Groq API keys and provider
   const [showSettings, setShowSettings] = useState(false);
-  const [customKey, setCustomKey] = useState("");
+  const [customGeminiKey, setCustomGeminiKey] = useState("");
+  const [customGroqKey, setCustomGroqKey] = useState("");
+  const [selectedProvider, setSelectedProvider] = useState<"auto" | "gemini" | "groq">("auto");
 
   // Guest trial warning modal state
   const [showAuthRequired, setShowAuthRequired] = useState(false);
 
   useEffect(() => {
-    const key = localStorage.getItem("queriosity_custom_gemini_key") || "";
-    setCustomKey(key);
+    setCustomGeminiKey(localStorage.getItem("queriosity_custom_gemini_key") || "");
+    setCustomGroqKey(localStorage.getItem("queriosity_custom_groq_key") || "");
+    setSelectedProvider(
+      (localStorage.getItem("queriosity_ai_provider") as any) || "auto"
+    );
   }, []);
 
   useEffect(() => {
@@ -76,11 +83,19 @@ function ChatPage() {
 
   const handleSaveSettings = (e: React.FormEvent) => {
     e.preventDefault();
-    if (customKey.trim()) {
-      localStorage.setItem("queriosity_custom_gemini_key", customKey.trim());
+    if (customGeminiKey.trim()) {
+      localStorage.setItem("queriosity_custom_gemini_key", customGeminiKey.trim());
     } else {
       localStorage.removeItem("queriosity_custom_gemini_key");
     }
+
+    if (customGroqKey.trim()) {
+      localStorage.setItem("queriosity_custom_groq_key", customGroqKey.trim());
+    } else {
+      localStorage.removeItem("queriosity_custom_groq_key");
+    }
+
+    localStorage.setItem("queriosity_ai_provider", selectedProvider);
     setShowSettings(false);
   };
 
@@ -104,6 +119,7 @@ function ChatPage() {
 
     setQuery("");
     setLoading(true);
+    setIsWarmingUp(false);
 
     const tempId = Date.now().toString();
     setMessages((prev) => [
@@ -116,12 +132,17 @@ function ChatPage() {
       },
     ]);
 
+    // Show warming up status if request takes longer than 3.5 seconds (Render cold start)
+    const warmingTimer = setTimeout(() => {
+      setIsWarmingUp(true);
+    }, 3500);
+
     try {
       const res = await api.chat.query(q);
       setMessages((prev) =>
         prev.map((m) =>
           m.id === tempId
-            ? { ...m, answer: res.answer, sources: res.sources }
+            ? { ...m, answer: res.answer, sources: res.sources, providerUsed: res.providerUsed }
             : m
         )
       );
@@ -144,7 +165,7 @@ function ChatPage() {
             ? {
                 ...m,
                 answer: isLimitReached
-                  ? "Daily AI query limit reached. Please configure your own Gemini API key in settings (gear icon) to continue."
+                  ? "Daily AI query limit reached. Please configure your own API key in settings (gear icon) to continue."
                   : `Error: ${err.message}`,
               }
             : m
@@ -155,10 +176,13 @@ function ChatPage() {
         setShowSettings(true);
       }
     } finally {
+      clearTimeout(warmingTimer);
+      setIsWarmingUp(false);
       setLoading(false);
       inputRef.current?.focus();
     }
   };
+
 
   const loadFromHistory = (msg: Message) => {
     setMessages([msg]);
@@ -342,9 +366,16 @@ function ChatPage() {
 
                     {/* Answer */}
                     <div>
-                      <div className="mb-2 flex items-center gap-2 text-[10px] uppercase tracking-widest text-white/50">
-                        <Sparkles className="h-3 w-3" />
-                        <span>Answer</span>
+                      <div className="mb-2 flex items-center justify-between">
+                        <div className="flex items-center gap-2 text-[10px] uppercase tracking-widest text-white/50">
+                          <Sparkles className="h-3 w-3" />
+                          <span>Answer</span>
+                        </div>
+                        {msg.providerUsed && (
+                          <div className="text-[10px] text-white/50 border border-white/10 bg-white/5 px-2 py-0.5 rounded-full flex items-center gap-1 font-mono">
+                            {msg.providerUsed === "groq" ? "⚡ Groq (Llama 3.3)" : "✨ Gemini 2.0"}
+                          </div>
+                        )}
                       </div>
                       <div className="text-xs sm:text-sm leading-relaxed text-white/85 whitespace-pre-wrap">
                         {msg.answer}
@@ -354,6 +385,13 @@ function ChatPage() {
                 ))
               )}
             </div>
+
+            {/* Warming notification for Render cold start */}
+            {loading && isWarmingUp && (
+              <div className="mb-2 text-center text-xs text-amber-300/90 border border-amber-500/20 bg-amber-500/10 px-3 py-1.5 rounded-full animate-pulse">
+                Waking up backend server on Render (cold start take up to ~30s)... Please wait!
+              </div>
+            )}
 
             {/* Input */}
             <form onSubmit={handleSubmit} className="mt-2 shrink-0">
@@ -393,19 +431,55 @@ function ChatPage() {
           <div className="liquid-glass-strong w-full max-w-md rounded-3xl p-6 border border-white/10 animate-in fade-in zoom-in-95 duration-200">
             <h3 className="text-lg font-medium text-white mb-2">Settings</h3>
             <p className="text-xs text-white/60 mb-4 font-normal">
-              Configure your custom Gemini API key. This key will be stored locally in your browser and used to bypass daily search limits or host key exhaustion.
+              Configure your API keys & preferred model provider. Custom keys bypass daily limit caps.
             </p>
             <form onSubmit={handleSaveSettings} className="space-y-4">
+              <div>
+                <label className="block text-xs text-white/60 mb-1.5">AI Provider</label>
+                <select
+                  value={selectedProvider}
+                  onChange={(e) => setSelectedProvider(e.target.value as any)}
+                  className="liquid-glass w-full rounded-xl px-4 py-2.5 text-xs text-white outline-none focus:ring-1 focus:ring-white/30 bg-black/40"
+                >
+                  <option value="auto" className="bg-neutral-900 text-white">Auto Fallback (Groq / Gemini)</option>
+                  <option value="groq" className="bg-neutral-900 text-white">Groq (Ultra-Fast Llama 3.3)</option>
+                  <option value="gemini" className="bg-neutral-900 text-white">Google Gemini 2.0</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs text-white/60 mb-1.5">Groq API Key</label>
+                <input
+                  type="password"
+                  value={customGroqKey}
+                  onChange={(e) => setCustomGroqKey(e.target.value)}
+                  className="liquid-glass w-full rounded-xl px-4 py-2.5 text-xs text-white placeholder-white/30 outline-none focus:ring-1 focus:ring-white/30"
+                  placeholder="Enter your Groq API key (gsk_...)"
+                />
+                <span className="text-[10px] text-white/40 mt-1 block">
+                  Get a free key from{" "}
+                  <a
+                    href="https://console.groq.com/keys"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="underline hover:text-white"
+                  >
+                    Groq Console
+                  </a>
+                  .
+                </span>
+              </div>
+
               <div>
                 <label className="block text-xs text-white/60 mb-1.5">Gemini API Key</label>
                 <input
                   type="password"
-                  value={customKey}
-                  onChange={(e) => setCustomKey(e.target.value)}
-                  className="liquid-glass w-full rounded-xl px-4 py-2.5 text-sm text-white placeholder-white/30 outline-none focus:ring-1 focus:ring-white/30"
+                  value={customGeminiKey}
+                  onChange={(e) => setCustomGeminiKey(e.target.value)}
+                  className="liquid-glass w-full rounded-xl px-4 py-2.5 text-xs text-white placeholder-white/30 outline-none focus:ring-1 focus:ring-white/30"
                   placeholder="Enter your Gemini API key (AIzaSy...)"
                 />
-                <span className="text-[10px] text-white/40 mt-1.5 block">
+                <span className="text-[10px] text-white/40 mt-1 block">
                   Get a free key from{" "}
                   <a
                     href="https://aistudio.google.com/apikey"
@@ -418,6 +492,7 @@ function ChatPage() {
                   .
                 </span>
               </div>
+
               <div className="flex gap-2 justify-end pt-2">
                 <button
                   type="button"
@@ -437,6 +512,7 @@ function ChatPage() {
           </div>
         </div>
       )}
+
 
       {/* Auth Required Warning Modal */}
       {showAuthRequired && (

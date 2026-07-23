@@ -19,10 +19,14 @@ router.post("/query", optionalAuth, async (req, res) => {
   }
 
   const { question } = parsed.data;
-  const customApiKey = req.headers["x-gemini-key"] as string | undefined;
+  const customGeminiKey = req.headers["x-gemini-key"] as string | undefined;
+  const customGroqKey = req.headers["x-groq-key"] as string | undefined;
+  const requestedProvider = (req.headers["x-ai-provider"] as string | undefined) || "auto";
+
+  const hasCustomKey = Boolean(customGeminiKey || customGroqKey);
 
   // Check daily limit for logged-in users using host key (no custom API key)
-  if (req.userId && !customApiKey) {
+  if (req.userId && !hasCustomKey) {
     try {
       const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
       const { count, error: countError } = await supabase
@@ -35,7 +39,7 @@ router.post("/query", optionalAuth, async (req, res) => {
         console.error("Failed to check daily query limit:", countError);
       } else if (count !== null && count >= 10) {
         res.status(429).json({
-          error: "Daily query limit reached (10 queries/day). Please set your own Gemini API key in settings to continue.",
+          error: "Daily query limit reached (10 queries/day). Please set your own API key in settings to continue.",
           code: "LIMIT_REACHED"
         });
         return;
@@ -53,7 +57,7 @@ router.post("/query", optionalAuth, async (req, res) => {
         maxResults: 4,
       });
     } catch (searchErr: any) {
-      console.error("Tavily search failed:", searchErr.message);
+      console.error("Tavily search failed:", searchErr.message || searchErr);
       searchResult = { results: [], query: question, responseTime: 0, images: [], requestId: "" };
     }
 
@@ -69,11 +73,64 @@ router.post("/query", optionalAuth, async (req, res) => {
       ? `Search results:\n${context}\n\nQuestion: ${question}`
       : `Question: ${question}`;
 
-    const { text } = await generateText({
-      model: getModel("gemini-1.5-flash", customApiKey),
-      system: systemPrompt,
-      prompt,
-    });
+    // Candidate model fallback lists
+    const geminiModels = ["gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-pro"];
+    const groqModels = ["llama-3.3-70b-versatile", "llama3-8b-8192"];
+
+    const attempts: { provider: "groq" | "gemini"; modelName: string }[] = [];
+
+    if (requestedProvider === "groq") {
+      groqModels.forEach((m) => attempts.push({ provider: "groq", modelName: m }));
+      geminiModels.forEach((m) => attempts.push({ provider: "gemini", modelName: m }));
+    } else if (requestedProvider === "gemini") {
+      geminiModels.forEach((m) => attempts.push({ provider: "gemini", modelName: m }));
+      groqModels.forEach((m) => attempts.push({ provider: "groq", modelName: m }));
+    } else {
+      if (customGroqKey || process.env.GROQ_API_KEY) {
+        groqModels.forEach((m) => attempts.push({ provider: "groq", modelName: m }));
+        geminiModels.forEach((m) => attempts.push({ provider: "gemini", modelName: m }));
+      } else {
+        geminiModels.forEach((m) => attempts.push({ provider: "gemini", modelName: m }));
+        groqModels.forEach((m) => attempts.push({ provider: "groq", modelName: m }));
+      }
+    }
+
+    let text = "";
+    let providerUsed: "gemini" | "groq" = "gemini";
+    let lastError: any = null;
+
+    for (const attempt of attempts) {
+      try {
+        const model = getModel({
+          provider: attempt.provider,
+          model: attempt.modelName,
+          customGeminiKey,
+          customGroqKey,
+        });
+
+        const result = await generateText({
+          model: model as any,
+          system: systemPrompt,
+          prompt,
+        });
+
+        text = result.text;
+        providerUsed = attempt.provider;
+        lastError = null;
+        break;
+      } catch (err: any) {
+        console.error(
+          `AI generation failed with provider '${attempt.provider}' (${attempt.modelName}):`,
+          err.message || err
+        );
+        lastError = err;
+      }
+    }
+
+    if (!text && lastError) {
+      throw lastError;
+    }
+
 
     if (req.userId) {
       const { error: dbError } = await supabase.from("queries").insert({
@@ -95,6 +152,7 @@ router.post("/query", optionalAuth, async (req, res) => {
     res.json({
       answer: text,
       sources: searchResult.results,
+      providerUsed,
     });
   } catch (err: any) {
     console.error("Query error:", err.message, err.stack);
@@ -104,9 +162,9 @@ router.post("/query", optionalAuth, async (req, res) => {
       err.message?.toLowerCase().includes("limit") ||
       err.message?.toLowerCase().includes("exhausted");
 
-    if (isQuotaError && !customApiKey) {
+    if (isQuotaError && !hasCustomKey) {
       res.status(429).json({
-        error: "Daily AI usage limit reached. Please set your own Gemini API key to continue.",
+        error: "Daily AI usage limit reached. Please set your own API key in settings to continue.",
         code: "LIMIT_REACHED",
       });
       return;
@@ -115,6 +173,7 @@ router.post("/query", optionalAuth, async (req, res) => {
     res.status(500).json({ error: `Failed to process query: ${err.message}` });
   }
 });
+
 
 router.get("/history", requireAuth, async (req, res) => {
   const { data, error } = await supabase

@@ -30,12 +30,15 @@ async function request<T>(
   if (token) headers.Authorization = `Bearer ${token}`;
 
   try {
-    const customKey =
-      typeof window !== "undefined"
-        ? localStorage.getItem("queriosity_custom_gemini_key")
-        : null;
-    if (customKey) {
-      headers["x-gemini-key"] = customKey;
+    if (typeof window !== "undefined") {
+      const customGeminiKey = localStorage.getItem("queriosity_custom_gemini_key");
+      if (customGeminiKey) headers["x-gemini-key"] = customGeminiKey;
+
+      const customGroqKey = localStorage.getItem("queriosity_custom_groq_key");
+      if (customGroqKey) headers["x-groq-key"] = customGroqKey;
+
+      const aiProvider = localStorage.getItem("queriosity_ai_provider");
+      if (aiProvider) headers["x-ai-provider"] = aiProvider;
     }
   } catch {}
 
@@ -70,6 +73,9 @@ async function request<T>(
 }
 
 export const api = {
+  health: {
+    ping: () => request<{ status: string; timestamp: string }>("/health", { method: "GET" }),
+  },
   auth: {
     signup: (email: string, password: string) =>
       request<{ user: any; session: any }>("/auth/signup", {
@@ -86,7 +92,7 @@ export const api = {
   },
   chat: {
     query: (question: string) =>
-      request<{ answer: string; sources: any[] }>("/chat/query", {
+      request<{ answer: string; sources: any[]; providerUsed?: "gemini" | "groq" }>("/chat/query", {
         method: "POST",
         body: JSON.stringify({ question }),
       }),
@@ -94,3 +100,4 @@ export const api = {
       request<{ queries: any[] }>("/chat/history", { method: "GET" }),
   },
 };
+

@@ -10,14 +10,24 @@ const PORT = parseInt(process.env.PORT || "3001", 10);
 app.use(
   cors({
     origin: process.env.CORS_ORIGIN || "*",
-    allowedHeaders: ["Content-Type", "Authorization", "x-gemini-key"],
+    allowedHeaders: ["Content-Type", "Authorization", "x-gemini-key", "x-groq-key", "x-ai-provider"],
   })
 );
 app.use(express.json());
 
+app.get("/", (_req, res) => {
+  res.json({
+    name: "Queriosity API",
+    status: "online",
+    health: "/health",
+    timestamp: new Date().toISOString(),
+  });
+});
+
 app.get("/health", (_req, res) => {
   res.json({ status: "ok", timestamp: new Date().toISOString() });
 });
+
 
 app.use("/auth", authRoutes);
 app.use("/chat", chatRoutes);

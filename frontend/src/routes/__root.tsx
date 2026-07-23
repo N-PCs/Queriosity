@@ -126,6 +126,20 @@ function RootShell({ children }: { children: ReactNode }) {
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
 
+  useEffect(() => {
+    // Ping backend in background on app load to wake up Render server (cold start mitigation)
+    const warmup = async () => {
+      try {
+        const { api } = await import("../lib/api/client");
+        await api.health.ping();
+        console.log("[Health] Backend server ping successful.");
+      } catch (err) {
+        console.warn("[Health] Warmup ping attempt:", err);
+      }
+    };
+    warmup();
+  }, []);
+
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
@@ -147,3 +161,4 @@ function RootComponent() {
     </QueryClientProvider>
   );
 }
+
