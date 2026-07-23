@@ -127,17 +127,17 @@ function RootComponent() {
   const { queryClient } = Route.useRouteContext();
 
   useEffect(() => {
-    // Ping backend in background on app load to wake up Render server (cold start mitigation)
-    const warmup = async () => {
+    // Ping backend in background on app load to verify connectivity
+    const checkBackend = async () => {
       try {
         const { api } = await import("../lib/api/client");
         await api.health.ping();
         console.log("[Health] Backend server ping successful.");
       } catch (err) {
-        console.warn("[Health] Warmup ping attempt:", err);
+        console.warn("[Health] Backend ping attempt:", err);
       }
     };
-    warmup();
+    checkBackend();
   }, []);
 
   return (

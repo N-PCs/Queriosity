@@ -38,7 +38,6 @@ function ChatPage() {
   const [query, setQuery] = useState("");
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(false);
-  const [isWarmingUp, setIsWarmingUp] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [history, setHistory] = useState<Message[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
@@ -119,7 +118,6 @@ function ChatPage() {
 
     setQuery("");
     setLoading(true);
-    setIsWarmingUp(false);
 
     const tempId = Date.now().toString();
     setMessages((prev) => [
@@ -131,11 +129,6 @@ function ChatPage() {
         sources: [],
       },
     ]);
-
-    // Show warming up status if request takes longer than 3.5 seconds (Render cold start)
-    const warmingTimer = setTimeout(() => {
-      setIsWarmingUp(true);
-    }, 3500);
 
     try {
       const res = await api.chat.query(q);
@@ -176,13 +169,10 @@ function ChatPage() {
         setShowSettings(true);
       }
     } finally {
-      clearTimeout(warmingTimer);
-      setIsWarmingUp(false);
       setLoading(false);
       inputRef.current?.focus();
     }
   };
-
 
   const loadFromHistory = (msg: Message) => {
     setMessages([msg]);
@@ -386,12 +376,7 @@ function ChatPage() {
               )}
             </div>
 
-            {/* Warming notification for Render cold start */}
-            {loading && isWarmingUp && (
-              <div className="mb-2 text-center text-xs text-amber-300/90 border border-amber-500/20 bg-amber-500/10 px-3 py-1.5 rounded-full animate-pulse">
-                Waking up backend server on Render (cold start take up to ~30s)... Please wait!
-              </div>
-            )}
+
 
             {/* Input */}
             <form onSubmit={handleSubmit} className="mt-2 shrink-0">
