@@ -74,7 +74,8 @@ router.post("/query", optionalAuth, async (req, res) => {
       : `Question: ${question}`;
 
     // Candidate model fallback lists
-    const geminiModels = ["gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-pro"];
+    const geminiModels = ["gemini-2.5-flash", "gemini-2.5-pro", "gemini-2.0-flash", "gemini-2.0-flash-lite"];
+
     const groqModels = ["llama-3.3-70b-versatile", "llama3-8b-8192"];
 
     const attempts: { provider: "groq" | "gemini"; modelName: string }[] = [];

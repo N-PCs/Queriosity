@@ -26,7 +26,7 @@ export function getModel(options: GetModelOptions = {}): any {
   }
 
   // Default provider: gemini
-  const modelName = options.model || "gemini-2.0-flash";
+  const modelName = options.model || "gemini-2.5-flash";
   if (customGeminiKey) {
     const customGoogle = createGoogleGenerativeAI({
       apiKey: customGeminiKey,
