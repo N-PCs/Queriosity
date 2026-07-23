@@ -68,6 +68,7 @@ chat.post("/query", optionalAuth, async (c) => {
       searchResult = await tavilyClient.search(question, {
         searchDepth: "basic",
         maxResults: 4,
+        includeImages: true,
       });
     } catch (searchErr: any) {
       console.error("Tavily search failed:", searchErr.message || searchErr);
@@ -75,12 +76,25 @@ chat.post("/query", optionalAuth, async (c) => {
     }
 
     const context = searchResult.results
-      .map((r: any) => `[${r.title}](${r.url}): ${r.content}`)
+      .map((r: any, idx: number) => `[Source ${idx + 1}] (${r.url}): ${r.content}`)
       .join("\n\n");
 
     const systemPrompt = searchResult.results.length > 0
-      ? `You are a helpful research assistant. Answer the user's question based on the provided search results. Cite sources where applicable.`
-      : `You are a helpful AI assistant. Answer the user's question to the best of your ability.`;
+      ? `You are a helpful research assistant. Answer the user's question based on the provided search results.
+You MUST cite your sources using simple numbers in brackets like [1], [2], etc., corresponding to the sources listed in the context.
+At the very end of your response, you MUST provide 2-3 short, relevant follow-up questions.
+Format the follow-up section exactly like this:
+Related questions:
+- First question?
+- Second question?
+- Third question?`
+      : `You are a helpful AI assistant. Answer the user's question to the best of your ability.
+At the very end of your response, you MUST provide 2-3 short, relevant follow-up questions.
+Format the follow-up section exactly like this:
+Related questions:
+- First question?
+- Second question?
+- Third question?`;
 
     const prompt = searchResult.results.length > 0
       ? `Search results:\n${context}\n\nQuestion: ${question}`
@@ -147,16 +161,23 @@ chat.post("/query", optionalAuth, async (c) => {
       throw lastError;
     }
 
+    const savedSources = [
+      ...searchResult.results.map((r: any) => ({
+        title: r.title,
+        url: r.url,
+        content: r.content,
+      })),
+      ...(searchResult.images && searchResult.images.length > 0
+        ? [{ type: "images", list: searchResult.images }]
+        : []),
+    ];
+
     if (userId) {
       const { error: dbError } = await supabase.from("queries").insert({
         user_id: userId,
         question,
         answer: text,
-        sources: searchResult.results.map((r: any) => ({
-          title: r.title,
-          url: r.url,
-          content: r.content,
-        })),
+        sources: savedSources,
       });
 
       if (dbError) {
@@ -166,7 +187,7 @@ chat.post("/query", optionalAuth, async (c) => {
 
     return c.json({
       answer: text,
-      sources: searchResult.results,
+      sources: savedSources,
       providerUsed,
     });
   } catch (err: any) {

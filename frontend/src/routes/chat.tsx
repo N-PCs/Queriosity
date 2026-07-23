@@ -10,6 +10,7 @@ import {
   History,
   LogOut,
   Settings,
+  Plus,
 } from "lucide-react";
 import { z } from "zod";
 
@@ -26,10 +27,87 @@ interface Message {
   id: string;
   question: string;
   answer: string;
-  sources: { title: string; url: string; content: string }[];
+  sources: { title: string; url: string; content: string; type?: string; list?: string[] }[];
   providerUsed?: "gemini" | "groq";
   created_at?: string;
 }
+
+const parseCitations = (text: string, sources: { title: string; url: string }[]) => {
+  if (!sources || sources.length === 0) return [text];
+
+  const regex = /\[(\d+)\]/g;
+  const elements: (string | React.ReactNode)[] = [];
+  let lastIndex = 0;
+  let match;
+
+  while ((match = regex.exec(text)) !== null) {
+    const matchIndex = match.index;
+    const citationNumber = parseInt(match[1], 10);
+
+    if (matchIndex > lastIndex) {
+      elements.push(text.substring(lastIndex, matchIndex));
+    }
+
+    if (citationNumber > 0 && citationNumber <= sources.length) {
+      const source = sources[citationNumber - 1];
+      let host = "";
+      try {
+        host = new URL(source.url).hostname;
+      } catch {
+        host = "source";
+      }
+
+      elements.push(
+        <a
+          key={`cite-${matchIndex}`}
+          href={source.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          title={`${source.title} — ${host}`}
+          className="liquid-glass mx-0.5 inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 align-text-top text-[10px] font-medium text-white/90 transition-transform hover:scale-110"
+        >
+          {citationNumber}
+        </a>
+      );
+    } else {
+      elements.push(match[0]);
+    }
+
+    lastIndex = regex.lastIndex;
+  }
+
+  if (lastIndex < text.length) {
+    elements.push(text.substring(lastIndex));
+  }
+
+  return elements.length > 0 ? elements : [text];
+};
+
+const parseAnswerContent = (answer: string) => {
+  const parts = answer.split(/related\s+questions:/i);
+  const mainText = parts[0].trim();
+  let relatedQuestions: string[] = [];
+
+  if (parts[1]) {
+    relatedQuestions = parts[1]
+      .split("\n")
+      .map((line) => line.replace(/^[\s\-\*\d\.\)]+/, "").trim())
+      .filter((line) => line.length > 0 && (line.endsWith("?") || line.length > 5));
+  }
+
+  return { mainText, relatedQuestions };
+};
+
+const renderAnswerParagraphs = (mainText: string, sources: { title: string; url: string }[]) => {
+  return mainText.split(/\n\n+/).map((para, idx) => {
+    if (!para.trim()) return null;
+    return (
+      <p key={idx} className="mb-4 last:mb-0">
+        {parseCitations(para, sources)}
+      </p>
+    );
+  });
+};
 
 function ChatPage() {
   const { user, logout, loading: authLoading } = useAuth();
@@ -98,11 +176,8 @@ function ChatPage() {
     setShowSettings(false);
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!query.trim() || loading) return;
-
-    const q = query.trim();
+  const submitQuery = async (q: string) => {
+    if (!q.trim() || loading) return;
 
     // Enforce 1 trial query limit for guest users (not signed in)
     if (!user) {
@@ -172,6 +247,11 @@ function ChatPage() {
       setLoading(false);
       inputRef.current?.focus();
     }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    submitQuery(query);
   };
 
   const loadFromHistory = (msg: Message) => {
@@ -321,56 +401,148 @@ function ChatPage() {
                       <span className="flex-1 text-xs sm:text-sm text-white">{msg.question}</span>
                     </div>
 
-                    {/* Sources */}
-                    {msg.sources.length > 0 && (
-                      <div className="mb-4">
-                        <div className="mb-2 text-[10px] uppercase tracking-widest text-white/50">
-                          Sources · {msg.sources.length}
-                        </div>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                          {msg.sources.map((s, i) => (
-                            <a
-                              key={i}
-                              href={s.url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="liquid-glass group flex items-start gap-3 rounded-2xl p-3 transition-transform hover:scale-[1.02]"
-                            >
-                              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-white/10 text-[10px] font-medium text-white">
-                                {i + 1}
-                              </span>
-                              <div className="min-w-0 flex-1">
-                                <div className="truncate text-[10px] text-white/60">
-                                  {new URL(s.url).hostname}
-                                </div>
-                                <div className="mt-0.5 line-clamp-2 text-xs text-white/90">
-                                  {s.title}
-                                </div>
-                              </div>
-                              <ArrowRight className="h-3.5 w-3.5 shrink-0 text-white/40 transition-colors group-hover:text-white/90" />
-                            </a>
-                          ))}
-                        </div>
-                      </div>
-                    )}
+                    {(() => {
+                      const rawSources = msg.sources || [];
+                      const filteredSources = rawSources.filter((s) => s.type !== "images");
+                      const imagesItem = rawSources.find((s) => s.type === "images");
+                      const images = imagesItem ? (imagesItem.list || []) : [];
+                      const { mainText, relatedQuestions } = parseAnswerContent(msg.answer);
+                      const videoSearchUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(msg.question)}`;
 
-                    {/* Answer */}
-                    <div>
-                      <div className="mb-2 flex items-center justify-between">
-                        <div className="flex items-center gap-2 text-[10px] uppercase tracking-widest text-white/50">
-                          <Sparkles className="h-3 w-3" />
-                          <span>Answer</span>
-                        </div>
-                        {msg.providerUsed && (
-                          <div className="text-[10px] text-white/50 border border-white/10 bg-white/5 px-2 py-0.5 rounded-full flex items-center gap-1 font-mono">
-                            {msg.providerUsed === "groq" ? "⚡ Groq (Llama 3.3)" : "✨ Gemini 2.0"}
+                      return (
+                        <>
+                          {/* Sources row */}
+                          {filteredSources.length > 0 && (
+                            <div className="mb-6">
+                              <div className="mb-3 text-xs uppercase tracking-widest text-white/50">
+                                Sources · {filteredSources.length}
+                              </div>
+                              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">
+                                {filteredSources.map((s, i) => {
+                                  let host = "";
+                                  try {
+                                    host = new URL(s.url).hostname;
+                                  } catch {
+                                    host = "source";
+                                  }
+                                  return (
+                                    <a
+                                      key={i}
+                                      href={s.url}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="liquid-glass group flex items-start gap-3 rounded-2xl p-3 transition-transform hover:scale-[1.02]"
+                                    >
+                                      <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-white/10 text-[10px] font-medium text-white">
+                                        {i + 1}
+                                      </span>
+                                      <div className="min-w-0 flex-1">
+                                        <div className="truncate text-xs text-white/60">{host}</div>
+                                        <div className="mt-0.5 line-clamp-2 text-xs text-white/90">{s.title}</div>
+                                      </div>
+                                      <ArrowRight className="h-3.5 w-3.5 shrink-0 text-white/40 transition-colors group-hover:text-white/90" />
+                                    </a>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Answer */}
+                          <div className="mt-6">
+                            <div className="mb-3 flex items-center justify-between">
+                              <div className="flex items-center gap-2 text-xs uppercase tracking-widest text-white/50">
+                                <Sparkles className="h-3 w-3" />
+                                <span>Answer</span>
+                              </div>
+                              {msg.providerUsed && (
+                                <div className="text-[10px] text-white/50 border border-white/10 bg-white/5 px-2 py-0.5 rounded-full flex items-center gap-1 font-mono">
+                                  {msg.providerUsed === "groq" ? "⚡ Groq (Llama 3.3)" : "✨ Gemini 2.5"}
+                                </div>
+                              )}
+                            </div>
+                            
+                            {msg.answer === "Thinking..." ? (
+                              <div className="flex items-center gap-2 text-xs text-white/50 animate-pulse py-2">
+                                <Sparkles className="h-3.5 w-3.5 animate-spin" />
+                                <span>Thinking...</span>
+                              </div>
+                            ) : (
+                              <div className="space-y-4 text-sm leading-relaxed text-white/85">
+                                {renderAnswerParagraphs(mainText, filteredSources)}
+                              </div>
+                            )}
                           </div>
-                        )}
-                      </div>
-                      <div className="text-xs sm:text-sm leading-relaxed text-white/85 whitespace-pre-wrap">
-                        {msg.answer}
-                      </div>
-                    </div>
+
+                          {/* Media Gallery (Visuals & Videos) */}
+                          {msg.answer !== "Thinking..." && (images.length > 0 || msg.question) && (
+                            <div className="mt-6 border-t border-white/10 pt-4">
+                              <div className="mb-3 text-[10px] uppercase tracking-widest text-white/50">
+                                Visuals & Videos
+                              </div>
+                              <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-none">
+                                {images.map((imgUrl: string, idx: number) => (
+                                  <a
+                                    key={idx}
+                                    href={imgUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="relative h-24 w-36 shrink-0 overflow-hidden rounded-2xl border border-white/10 group block"
+                                  >
+                                    <img
+                                      src={imgUrl}
+                                      alt={`Visual ${idx + 1}`}
+                                      className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-110"
+                                      onError={(e) => {
+                                        (e.target as HTMLElement).style.display = "none";
+                                      }}
+                                    />
+                                  </a>
+                                ))}
+                                {/* Youtube search shortcut card */}
+                                <a
+                                  href={videoSearchUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="relative h-24 w-36 shrink-0 flex flex-col justify-between p-3 rounded-2xl border border-white/10 bg-red-950/20 hover:bg-red-900/20 transition-colors group"
+                                >
+                                  <div className="flex h-6 w-6 items-center justify-center rounded-full bg-red-600/20 text-red-500">
+                                    <span className="text-[9px]">▶</span>
+                                  </div>
+                                  <div className="min-w-0">
+                                    <div className="text-[8px] uppercase tracking-widest text-red-400">YouTube</div>
+                                    <div className="mt-0.5 truncate text-[10px] font-medium text-white/90">
+                                      Watch videos
+                                    </div>
+                                  </div>
+                                </a>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Follow-ups */}
+                          {msg.answer !== "Thinking..." && relatedQuestions.length > 0 && (
+                            <div className="mt-6 border-t border-white/10 pt-4">
+                              <div className="mb-3 text-xs uppercase tracking-widest text-white/50">
+                                Related questions
+                              </div>
+                              <div className="flex flex-col gap-2">
+                                {relatedQuestions.map((q) => (
+                                  <button
+                                    key={q}
+                                    onClick={() => submitQuery(q)}
+                                    className="liquid-glass group flex items-center justify-between rounded-2xl px-4 py-3 text-left text-sm text-white/85 transition-transform hover:scale-[1.01]"
+                                  >
+                                    <span>{q}</span>
+                                    <Plus className="h-4 w-4 text-white/50 transition-colors group-hover:text-white" />
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </>
+                      );
+                    })()}
                   </div>
                 ))
               )}
